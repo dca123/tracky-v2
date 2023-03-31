@@ -7,8 +7,11 @@ import { api } from "~/utils/api";
 import { clsx } from "clsx";
 import { create } from "zustand";
 import { XCircleIcon } from "@heroicons/react/24/outline";
+import Fuse from "fuse.js";
 
 import { motion } from "framer-motion";
+import { SearchField } from "~/components/Search";
+import { useState } from "react";
 interface IssueState {
   days: {
     monday: string[];
@@ -165,12 +168,33 @@ const Issues = () => {
   const query = api.jiraRouter.issues.useQuery(undefined, {
     placeholderData: [],
   });
-  console.log(query.data);
+  const [search, setSearch] = useState("");
+
+  if (query.isLoading) {
+    return <div>loading</div>;
+  }
+  if (query.isError) {
+    return <div>error</div>;
+  }
+
+  const fuse = new Fuse(query.data, {
+    keys: ["title", "epic"],
+    ignoreLocation: true,
+  });
+
+  const result = fuse.search(search).map((r) => r.item);
+  console.log(result);
+
+  const data = search === "" ? query.data : result;
+
   return (
     <div className="space-y-4 rounded border-2 border-slate-300 p-6">
-      <h1 className="text-2xl font-thin"> Issues</h1>
+      <div className="flex flex-row items-center space-x-4 ">
+        <h1 className="text-2xl font-thin"> Issues</h1>
+        <SearchField value={search} onChange={(val) => setSearch(val)} />
+      </div>
       <div className="grid grid-cols-3 gap-4">
-        {query.data?.map((issue) => (
+        {data.map((issue) => (
           <Issue
             key={issue.id}
             title={issue.title}
