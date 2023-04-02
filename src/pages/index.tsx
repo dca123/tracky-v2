@@ -9,9 +9,10 @@ import { create } from "zustand";
 import { XCircleIcon } from "@heroicons/react/24/outline";
 import Fuse from "fuse.js";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { SearchField } from "~/components/Search";
 import { useState } from "react";
+import { startOfWeek } from "date-fns";
 interface IssueState {
   days: {
     monday: string[];
@@ -25,7 +26,7 @@ interface IssueState {
 }
 const useIssuesStore = create<IssueState>((set) => ({
   days: {
-    monday: ["aa"],
+    monday: [],
     tuesday: [],
     wednesday: [],
     thursday: [],
@@ -50,11 +51,21 @@ const useIssuesStore = create<IssueState>((set) => ({
 }));
 
 const Home: NextPage = () => {
-  const query = api.jiraRouter.issues.useQuery();
   const addIssue = useIssuesStore((state) => state.addIssue);
-  if (query.data) {
-    console.log(query.data);
-  }
+  const issues = useIssuesStore((state) => state.days);
+  const mutation = api.tempoRouter.addLogs.useMutation();
+  const handleSubmit = () => {
+    mutation.mutate({
+      startOfWeek: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      logs: {
+        monday: issues.monday,
+        tuesday: issues.tuesday,
+        wednesday: issues.wednesday,
+        thursday: issues.thursday,
+        friday: issues.friday,
+      },
+    });
+  };
   return (
     <>
       <Head>
@@ -63,7 +74,19 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <main className="container mx-auto min-h-screen space-y-2">
-        <h1 className="pt-4 text-xl text-slate-700">Tracky</h1>
+        <div className="flex flex-row items-center justify-between  pt-4">
+          <h1 className="text-xl text-slate-700">Tracky</h1>
+          <motion.button
+            layout
+            className="rounded border-2 border-emerald-500 p-1 px-2 text-sm font-semibold text-green-600"
+            whileHover={{
+              scale: 1.05,
+            }}
+            onClick={handleSubmit}
+          >
+            Submit Timesheet
+          </motion.button>
+        </div>
         <div className="container flex space-x-2">
           <DndContext
             onDragEnd={(e) => {
@@ -117,18 +140,24 @@ const Day = (props: DayProps) => {
         {capitalize(props.label)}
       </h1>
       <div className="grid grid-cols-2 gap-2">
-        {issues.map((issue) => (
-          <div
-            key={issue}
-            className="flex flex-row items-center justify-between rounded-lg bg-emerald-200 px-3 py-2"
-          >
-            <p className="text-emerald-900">{issue}</p>
-            <XCircleIcon
-              className="h-5 w-5 cursor-pointer text-emerald-800"
-              onClick={() => removeIssues(issue, props.label)}
-            />
-          </div>
-        ))}
+        <AnimatePresence>
+          {issues.map((issue) => (
+            <motion.div
+              key={issue}
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+            >
+              <div className="flex flex-row items-center justify-between rounded-lg bg-emerald-200 px-3 py-2">
+                <p className="text-emerald-900">{issue}</p>
+                <XCircleIcon
+                  className="h-5 w-5 cursor-pointer text-emerald-800"
+                  onClick={() => removeIssues(issue, props.label)}
+                />
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -202,7 +231,7 @@ const Issues = () => {
           <Issue
             key={issue.id}
             title={issue.title}
-            id={issue.key}
+            id={issue.id}
             epic={issue.epic}
           />
         ))}

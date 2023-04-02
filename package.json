@@ -20,6 +20,7 @@
     "@trpc/react-query": "^10.18.0",
     "@trpc/server": "^10.18.0",
     "clsx": "^1.2.1",
+    "date-fns": "^2.29.3",
     "framer-motion": "^10.10.0",
     "fuse.js": "^6.6.2",
     "next": "^13.2.4",
