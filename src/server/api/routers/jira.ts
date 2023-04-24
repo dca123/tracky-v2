@@ -8,7 +8,7 @@ export const jiraRouter = createTRPCRouter({
 
 export const getIssues = async () => {
   const api =
-    "search?jql=assignee = 'Devinda Senanayaka' AND (created >= startOfYear() AND resolutiondate <= endOfWeek() OR updated >= startOfWeek())";
+    "search?jql=assignee = 'Devinda Senanayaka' AND (created >= startOfYear())";
   const response = await fetch(
     `https://parklaneit.atlassian.net/rest/api/3/${api}`,
     {

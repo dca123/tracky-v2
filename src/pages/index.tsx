@@ -1,7 +1,5 @@
 import { type NextPage } from "next";
 import Head from "next/head";
-import Link from "next/link";
-import { signIn, signOut, useSession } from "next-auth/react";
 import { DndContext, useDraggable, useDroppable } from "@dnd-kit/core";
 import { api } from "~/utils/api";
 import { clsx } from "clsx";
@@ -10,6 +8,7 @@ import {
   XCircleIcon,
   ChevronDownIcon,
   CheckIcon,
+  ChevronUpIcon,
 } from "@heroicons/react/24/outline";
 import Fuse from "fuse.js";
 
@@ -17,9 +16,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { SearchField } from "~/components/Search";
 import { useState } from "react";
 import {
-  eachDayOfInterval,
   eachWeekOfInterval,
-  endOfToday,
   format,
   startOfToday,
   startOfWeek,
@@ -65,20 +62,7 @@ const useIssuesStore = create<IssueState>((set) => ({
 
 const Home: NextPage = () => {
   const addIssue = useIssuesStore((state) => state.addIssue);
-  const issues = useIssuesStore((state) => state.days);
-  const mutation = api.tempoRouter.addLogs.useMutation();
-  const handleSubmit = () => {
-    mutation.mutate({
-      startOfWeek: startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 }),
-      logs: {
-        monday: issues.monday,
-        tuesday: issues.tuesday,
-        wednesday: issues.wednesday,
-        thursday: issues.thursday,
-        friday: issues.friday,
-      },
-    });
-  };
+
   return (
     <>
       <Head>
@@ -90,16 +74,7 @@ const Home: NextPage = () => {
         <div className="flex flex-row items-center justify-between  pt-4">
           <h1 className="text-xl text-slate-700">Tracky</h1>
           <WeekSelect />
-          <motion.button
-            layout
-            className="rounded border-2 border-emerald-500 p-1 px-2 text-sm font-semibold text-green-600"
-            whileHover={{
-              scale: 1.05,
-            }}
-            onClick={handleSubmit}
-          >
-            Submit Timesheet
-          </motion.button>
+          <SubmitTimesheetButton />
         </div>
         <div className="container flex flex-col space-y-4">
           <DndContext
@@ -251,6 +226,16 @@ const Issues = () => {
   );
 };
 
+interface WeekStore {
+  week: Date;
+  setWeek: (weeks: Date) => void;
+}
+
+const useWeekStore = create<WeekStore>((set) => ({
+  week: startOfWeek(startOfToday(), { weekStartsOn: 1 }),
+  setWeek: (week) => set({ week }),
+}));
+
 const WeekSelect = () => {
   const weeks = eachWeekOfInterval(
     {
@@ -261,10 +246,19 @@ const WeekSelect = () => {
       weekStartsOn: 1,
     }
   );
-  console.log(weeks);
+  const { week, setWeek } = useWeekStore((state) => ({
+    setWeek: state.setWeek,
+    week: state.week,
+  }));
 
   return (
-    <Select.Root>
+    <Select.Root
+      value={week.toString()}
+      onValueChange={(week) => {
+        setWeek(new Date(week));
+      }}
+      defaultValue={week.toString()}
+    >
       <Select.Trigger className="inline-flex h-8 items-center justify-center gap-4 rounded border-emerald-500 bg-white px-4 text-sm text-emerald-700 outline-none hover:bg-slate-50 focus:border-2 focus:shadow-md data-[placeholder]:text-emerald-600">
         <Select.Value placeholder="Start of Week" />
         <Select.Icon>
@@ -273,6 +267,9 @@ const WeekSelect = () => {
       </Select.Trigger>
       <Select.Portal>
         <Select.Content className="overflow-hidden rounded border bg-white shadow-md">
+          <Select.ScrollUpButton className="flex h-4 cursor-default items-center justify-center bg-white">
+            <ChevronUpIcon className="h-4" />
+          </Select.ScrollUpButton>
           <Select.Viewport className="p-4">
             {weeks.map((week) => (
               <SelectItem key={week.toString()} value={week.toString()}>
@@ -304,3 +301,35 @@ const SelectItem = (props: SelectItemProps) => {
 };
 
 export default Home;
+
+// type SubmitTimesheetButtonProps = {};
+const SubmitTimesheetButton = () => {
+  const issues = useIssuesStore((state) => state.days);
+  const mutation = api.tempoRouter.addLogs.useMutation();
+  const week = useWeekStore((state) => state.week);
+  const handleSubmit = () => {
+    mutation.mutate({
+      startOfWeek: week,
+      logs: {
+        monday: issues.monday,
+        tuesday: issues.tuesday,
+        wednesday: issues.wednesday,
+        thursday: issues.thursday,
+        friday: issues.friday,
+      },
+    });
+  };
+
+  return (
+    <motion.button
+      layout
+      className="rounded border-2 border-emerald-500 p-1 px-2 text-sm font-semibold text-green-600"
+      whileHover={{
+        scale: 1.05,
+      }}
+      onClick={handleSubmit}
+    >
+      {mutation.isLoading ? "Saving to Tempo" : "Submit Timesheet"}
+    </motion.button>
+  );
+};
