@@ -23,41 +23,52 @@ import {
   subWeeks,
 } from "date-fns";
 import * as Select from "@radix-ui/react-select";
+import { inferRouterOutputs } from "@trpc/server";
+import { AppRouter } from "~/server/api/root";
+
+type Issue = inferRouterOutputs<AppRouter>["jiraRouter"]["issues"][number];
+
 interface IssueState {
   days: {
-    monday: string[];
-    tuesday: string[];
-    wednesday: string[];
-    thursday: string[];
-    friday: string[];
+    monday: Issue[];
+    tuesday: Issue[];
+    wednesday: Issue[];
+    thursday: Issue[];
+    friday: Issue[];
   };
-  addIssue: (issue: string, day: keyof IssueState["days"]) => void;
-  removeIssue: (issue: string, day: keyof IssueState["days"]) => void;
+  addIssue: (issue: Issue, day: keyof IssueState["days"]) => void;
+  removeIssue: (issue: Issue, day: keyof IssueState["days"]) => void;
+  reset: () => void;
 }
+
+const initialState = {
+  monday: [],
+  tuesday: [],
+  wednesday: [],
+  thursday: [],
+  friday: [],
+};
+
 const useIssuesStore = create<IssueState>((set) => ({
-  days: {
-    monday: [],
-    tuesday: [],
-    wednesday: [],
-    thursday: [],
-    friday: [],
-  },
+  days: initialState,
   addIssue: (issue, day) =>
     set((state) => ({
       days: {
         ...state.days,
-        [day]: state.days[day].includes(issue)
-          ? state.days[day]
-          : [...state.days[day], issue],
+        [day]:
+          state.days[day].find((i) => i.id === issue.id) !== undefined
+            ? state.days[day]
+            : [...state.days[day], issue],
       },
     })),
   removeIssue: (issue, day) =>
     set((state) => ({
       days: {
         ...state.days,
-        [day]: state.days[day].filter((i) => i !== issue),
+        [day]: state.days[day].filter((i) => i.id !== issue.id),
       },
     })),
+  reset: () => set({ days: initialState }),
 }));
 
 const Home: NextPage = () => {
@@ -81,7 +92,7 @@ const Home: NextPage = () => {
             onDragEnd={(e) => {
               if (e.active.id && e.over?.id) {
                 addIssue(
-                  e.active.id as string,
+                  e.active.data.current as Issue,
                   e.over.id as keyof IssueState["days"]
                 );
               }
@@ -119,7 +130,7 @@ const Day = (props: DayProps) => {
   return (
     <div
       className={clsx(
-        "min-h-[6rem] w-full space-y-1 rounded border-2 border-slate-300 p-2",
+        "min-h-[6rem] w-full space-y-2 rounded border-2 border-slate-300 p-2",
         isOver ? "bg-green-200" : "bg-slate-50"
       )}
       ref={setNodeRef}
@@ -127,17 +138,17 @@ const Day = (props: DayProps) => {
       <h1 className="text-xl font-light text-green-900">
         {capitalize(props.label)}
       </h1>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2">
         <AnimatePresence>
           {issues.map((issue) => (
             <motion.div
-              key={issue}
+              key={issue.id}
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -50 }}
             >
-              <div className="flex flex-row items-center justify-between rounded-lg bg-emerald-200 px-3 py-2">
-                <p className="text-emerald-900">{issue}</p>
+              <div className="flex w-fit flex-row items-center justify-between space-x-2 rounded-lg bg-emerald-200 px-3 py-2">
+                <p className="text-sm text-emerald-900">{issue.label}</p>
                 <XCircleIcon
                   className="h-5 w-5 cursor-pointer text-emerald-800"
                   onClick={() => removeIssues(issue, props.label)}
@@ -151,14 +162,10 @@ const Day = (props: DayProps) => {
   );
 };
 
-type IssueProps = {
-  title: string;
-  id: string;
-  epic?: string;
-};
-const Issue = (props: IssueProps) => {
+const Issue = (props: Issue) => {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: props.id,
+    data: props,
   });
 
   const style = transform
@@ -214,12 +221,7 @@ const Issues = () => {
       </div>
       <div className="grid grid-cols-4 gap-4">
         {data.map((issue) => (
-          <Issue
-            key={issue.id}
-            title={issue.title}
-            id={issue.id}
-            epic={issue.epic}
-          />
+          <Issue key={issue.id} {...issue} />
         ))}
       </div>
     </div>
@@ -304,20 +306,28 @@ export default Home;
 
 // type SubmitTimesheetButtonProps = {};
 const SubmitTimesheetButton = () => {
-  const issues = useIssuesStore((state) => state.days);
+  const { issues, reset } = useIssuesStore((state) => ({
+    issues: state.days,
+    reset: state.reset,
+  }));
   const mutation = api.tempoRouter.addLogs.useMutation();
   const week = useWeekStore((state) => state.week);
   const handleSubmit = () => {
-    mutation.mutate({
-      startOfWeek: week,
-      logs: {
-        monday: issues.monday,
-        tuesday: issues.tuesday,
-        wednesday: issues.wednesday,
-        thursday: issues.thursday,
-        friday: issues.friday,
+    mutation.mutate(
+      {
+        startOfWeek: week,
+        logs: {
+          monday: issues.monday.map((i) => i.id),
+          tuesday: issues.tuesday.map((i) => i.id),
+          wednesday: issues.wednesday.map((i) => i.id),
+          thursday: issues.thursday.map((i) => i.id),
+          friday: issues.friday.map((i) => i.id),
+        },
       },
-    });
+      {
+        onSuccess: () => reset(),
+      }
+    );
   };
 
   return (

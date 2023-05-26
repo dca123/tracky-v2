@@ -40,9 +40,10 @@ const IssueSchema = z
     }),
   })
   .transform((issue) => {
-    const { fields, ...rest } = issue;
+    const { fields, key, ...rest } = issue;
     return {
       ...rest,
+      label: key,
       title: fields.summary,
       epic: fields.parent?.fields.summary,
     };
