@@ -182,9 +182,11 @@ const Issue = (props: Issue) => {
           scale: 1.05,
         }}
       >
-        <div className="flex flex-row items-center justify-between">
+        <div className="flex flex-row justify-between">
           <p className="font-semibold text-emerald-800">{props.title}</p>
-          <p className="text-sm font-light text-emerald-900">{props.id}</p>
+          <p className="text-sm font-light leading-6 text-emerald-900">
+            {props.id}
+          </p>
         </div>
         <p className="text-sm text-emerald-800">{props.epic}</p>
       </motion.div>
@@ -208,6 +210,7 @@ const Issues = () => {
   const fuse = new Fuse(query.data, {
     keys: ["title", "epic"],
     ignoreLocation: true,
+    shouldSort: true,
   });
 
   const result = fuse.search(search).map((r) => r.item);
